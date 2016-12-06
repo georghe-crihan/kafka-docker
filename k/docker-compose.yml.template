@@ -1,0 +1,16 @@
+version: '2'
+services:
+  kafka:
+    build: .
+    ports:
+      - "9092"
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: @ADVETISED_HOST_NAME@
+      KAFKA_CREATE_TOPIC: devopstest:1:@INITIAL_SCALE@
+      KAFKA_ZOOKEEPER_CONNECT: 10.211.55.2:2181
+      KAFKA_DOCKER_ZK_ROOT: /dockerized
+      KAFKA_VIRT_HOST_IP: @VIRT_HOST_IP@ 
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+

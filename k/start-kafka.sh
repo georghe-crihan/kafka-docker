@@ -4,7 +4,9 @@ if [[ -z "$KAFKA_PORT" ]]; then
     export KAFKA_PORT=9092
 fi
 if [[ -z "$KAFKA_ADVERTISED_PORT" ]]; then
-    export KAFKA_ADVERTISED_PORT=$(docker port `hostname` $KAFKA_PORT | sed -r "s/.*:(.*)/\1/g")
+# The original had docker installed, we prefer to have no docker inside containers for security reasons (not willing to have dockerd on the techhost open).
+    export KAFKA_ADVERTISED_PORT=9092
+    echo KAFKA_ADVERTISET_PORT not specified, defaulting to ${KAFKA_ADVERTISED_PORT}
 fi
 if [[ -z "$KAFKA_BROKER_ID" ]]; then
     # By default auto allocate broker ID
@@ -48,6 +50,13 @@ KAFKA_PID=0
 
 # see https://medium.com/@gchudnov/trapping-signals-in-docker-containers-7a57fdda7d86#.bh35ir4u5
 term_handler() {
+  echo 'Stopping watchdog....'
+  if [ $WATCHDOG_PID -ne 0 ]; then
+    kill -s TERM "$WATCHDOG_PID"
+    wait "$WATCHDOG_PID"
+  fi
+  echo 'Watchdog stopped.'
+
   echo 'Stopping Kafka....'
   if [ $KAFKA_PID -ne 0 ]; then
     kill -s TERM "$KAFKA_PID"
@@ -60,8 +69,10 @@ term_handler() {
 
 # Capture kill requests to stop properly
 trap "term_handler" SIGHUP SIGINT SIGTERM
-create-topics.sh &
+/opt/bin/create-topics.sh &
 $KAFKA_HOME/bin/kafka-server-start.sh $KAFKA_HOME/config/server.properties &
 KAFKA_PID=$!
+/opt/bin/kafka-watchdog.sh "${KAFKA_PID}" "${KAFKA_DOCKER_ZK_ROOT}" &
+WATCHDOG_PID=${!}
 
 wait "$KAFKA_PID"

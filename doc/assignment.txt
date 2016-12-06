@@ -1,0 +1,9 @@
+DevOps assignment
+
+> Create an automated procedure for creation of a Kafka cluster.
+> By using the procedure we should be able to create a new cluster and add/remove nodes from the cluster, without disrupting it’s work.
+> The procedure should be runnable from a Unix based workstation (ex. OSX/Linux).
+> Using Docker would be our preferred method but if you have experience with something else (Chef, Puppet etc.) you can use it, as long as we can test it on our machines.
+> The procedure should have functional tests to check every operation (at least bootstrap, add node, remove node, cluster status).
+
+

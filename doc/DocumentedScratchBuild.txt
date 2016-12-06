@@ -1,0 +1,44 @@
+#!/bin/sh
+
+DOCKER-ENGINE
+10. sudo tee /etc/yum.repos.d/docker.repo <<EOF
+[dockerrepo]
+name=Docker Repository
+baseurl=https://yum.dockerproject.org/repo/main/sentos/7/
+enabled=1
+gpgcheck=1
+gpgkey=https://yum.dockerproject.org/gpg
+EOF
+11. sudo yum install docker-engine
+12. sudo systemctl enable docker.service
+13. sudo systemctl start docker
+
+DOCKER-REGISTRY (OPTIONAL, ONLY ON TECHHOST)
+14. sudo yum install docker-registry
+15. sudo systemctl enable docker-registry.service
+16. sudo service docker-registry start
+echo Could set up /etc/docker-registry.yml
+echo local
+echo storage_path =
+
+PREPARE STOCK CENTOS 7 DOCKER IMAGE
+17. sudo curl -L "https://raw.githubusercontent.com/docker/docker/master/contrib/mkimage-yum.sh" -o /opt/bin/mkimage-yum.sh
+18. chmod +x /opt/bin/mkimage-yum.sh
+19. /opt/bin/mkimage-yum.sh centos
+docker images
+docker ps -a
+echo docker commit image-id localhost:50000/centos:7.1
+docker push localhost:50000
+
+docker run -i image-id
+
+18. GOSU: Setup gosu for easier command execution
+19. sudo gpg --keyserver pool.sks-keyservers.net --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 \
+    && sudo curl -o /root/k/gosu -SL "https://github.com/tianon/gosu/releases/download/1.2/gosu-amd64" \
+    && sudo curl -o /root/gosu.asc -SL "https://github.com/tianon/gosu/releases/download/1.2/gosu-amd64.asc" \
+    && sudo gpg --verify /root/gosu.asc \
+    && sudo rm /root/gosu.asc \
+    && sudo rm -r /root/.gnupg/
+
+20. PLAY AROUND: docker run -i -t /bin/bash 
+

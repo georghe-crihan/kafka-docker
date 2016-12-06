@@ -1,0 +1,18 @@
+DESCRIPTION: High level plan to remove broker(s) from a cluster.
+PRE-REQUISITES:
+0. Prepare a technical plan for the activities involved.
+0.a. Make sure the plan has been tested in a production-like environment.
+0.b. Make sure the plan contains a reasonable rollback section which has been tested as well.
+0.c. Make sure the plan contains a reasonable verification section agreed upon with the end users.
+1. Identify the topics served by the particular brokers.
+2. Identify the stakeholders, whose business operations could be affected by the
+topics from p.1.
+3. Identify the risks arising if not removing the brokers.
+4. Identify the risks if removing the brokers.
+5. Identify the risks of loosing the whole cluster as a result of failure during
+the removal of the brokers. In particular, make sure there is a business continuity procedure and a disaster recovery plan.
+6. Notify the stakeholders from p.2 of upcoming operational activities.
+7. Agree the time of the activities, making sure to reserve enough time (in practice x3 of the initially planned) for rollback/disaster recovery activities.
+8. Agree on the post-implementation check activities with the end users, if possible. Make sure p.0.c. is agreed upon.
+
+IMPLEMENTATION

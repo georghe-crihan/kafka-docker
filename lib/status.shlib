@@ -1,0 +1,145 @@
+STATUSCMD="${KAFKA_HOME}/bin/kafka-reassign-partitions.sh --zookeeper ${ZK_LIST} --verify --reassignment-json-file="
+
+function send_attached()
+{
+local MSGFILE
+local SUBJECT="${1}"
+local A1="${2}"
+local A2="${3}"
+local A3="${4}"
+
+if [ $( uname -s ) == "Darwin" ]; then
+  MSGFILE=$( mktemp -t XXXXXXmessage.${$} )
+#  echo "Darwin detected ${MSGFILE}"
+
+  cat <<EOM >> "${MSGFILE}"
+From: "System Administrator"<root at example.com>
+To: ${MAILLIST} 
+Subject: ${SUBJECT} 
+Content-Type: multipart/mixed;
+        boundary="This_can_not_match_any_other_line_in_the_message"
+MIME-Verion: 1.0
+
+--This_can_not_match_any_other_line_in_the_message
+Content-Transfer-Encoding: quoted-printable
+Content-type: text/plain
+
+See the logs attached.
+
+EOM
+
+  for a in "${A1}" "${A2}" "${A3}"; do
+    cat <<EOM >> ${MSGFILE}
+--This_can_not_match_any_other_line_in_the_message
+Content-Transfer-Encoding: base64 
+Content-Type: text/plain;
+        name="${a}"
+Content-Disposition: attachment;
+        filename="${a}"
+
+EOM
+
+    uuencode -m "${a}" "${a}"  >> "${MSGFILE}" 
+done
+
+cat <<EOM >> "${MSGFILE}"
+
+--This_can_not_match_any_other_line_in_the_message--
+EOM
+
+  "${MAIL}" "${MAILLIST}" < "${MSGFILE}"
+  rm -f "${MSGFILE}"
+else
+  echo '.' | "${MAIL}" "${MAILLIST}" -s ${SUBJECT} -a"${A1}" -a"${A2}" -a"${A3}"
+fi
+  return $?
+}
+
+function is_in_progress()
+{
+local JSONFILE="${1}"
+
+  ${STATUSCMD}${JSONFILE} | grep -Eq 'Reassignment of partition \[.*,.*\] is still in progress'
+  return ${?}
+}
+
+function has_errors()
+{
+local JSONFILE="${1}"
+
+  ${STATUSCMD}${JSONFILE} | grep -Eq '^ERROR: '
+  return ${?}
+}
+
+function has_failed()
+{
+local JSONFILE="${1}"
+
+  ${STATUSCMD}${JSONFILE} | grep -Eq 'Reassignment of partition \[.*,.*\] failed'
+  return ${?}
+}
+
+function send_failed()
+{
+local LOGFILE="${1}"
+local JSONFILE="${2}"
+local BACKUPJSONFILE="${3}"
+
+  send_attached "FAILURE: Reassign of partitions" "${LOGFILE}" "${JSONFILE}" "${BACKUPJSONFILE}"
+  return $?
+}
+
+function send_errors()
+{
+local LOGFILE="${1}"
+local JSONFILE="${2}"
+local BACKUPJSONFILE="${3}"
+
+  send_attached "ERROR: Reassign of partitions completed with errors" "${LOGFILE}" "${JSONFILE}" "${BACKUPJSONFILE}"
+  return $?
+}
+
+function send_completed()
+{
+local LOGFILE="${1}"
+local JSONFILE="${2}"
+local BACKUPJSONFILE="${3}"
+
+  send_attached "SUCCESS: Reassign of partitions" "${LOGFILE}" "${JSONFILE}" "${BACKUPJSONFILE}"
+  return $?
+}
+
+function status_loop
+{
+local LOGFILE="${1}"
+local JSONFILE="${2}"
+local BACKUPJSONFILE="${3}"
+
+  while true; do
+	has_failed "${JSONFILE}"
+	if [ ! ${?} ]; then
+          echo Reassign of partitions failed, see ${JSONFILE}.
+	  ${STATUSCMD}${JSONFILE} > "${LOGFILE}" 
+	  send_failed "${LOGFILE}" "${JSONFILE}" "${BACKUPJSONFILE}"
+          return 1 
+        fi
+
+	is_in_progress "${JSONFILE}"
+        if [ ${?} ]; then
+          echo Reassign of partitions completed.
+          ${STATUSCMD}${JSONFILE} > "${LOGFILE}"
+          has_errors "${JSONFILE}"
+          if [ ${?} ]; then
+            send_errors "${LOGFILE}" "${JSONFILE}" "${BACKUPJSONFILE}"
+            return 1 
+          else
+            send_completed "${LOGFILE}" "${JSONFILE}" "${BACKUPJSONFILE}"
+            rm -f "${JSONFILE}"
+            rm -f "${LOGFILE}"
+            return 0
+          fi
+        fi
+
+	sleep ${POLLINTERVAL} 
+  done
+}

@@ -1,0 +1,132 @@
+function docker_container_id_from_host_port()
+{
+local HOST="${1}"
+
+  docker --host=$( getdockersock "${HOST}" ) ps | awk "{if (\$2==\"${DOCKER_IMAGE_TAG}\") { split(\"${HOST}\", h, \":\"); split(\$6, p, \":\"); if (p[2]==h[2]) print \$1 } }"
+}
+
+function docker_container_id_list_from_host()
+{
+local HOST="${1}"
+
+  docker --host=$( getdockersock "${HOST}" ) ps | awk "{if (\$2==\"${DOCKER_IMAGE_TAG}\") { print \$1 } }"
+}
+
+function docker_container_id_port_list_from_host()
+{
+local HOST="${1}"
+
+  docker --host=$( getdockersock "${HOST}" ) ps | awk "{if (\$2==\"${DOCKER_IMAGE_TAG}\") { l=NF-1; printf(\"%s=%s \", \$1, \$l) } }"
+}
+
+function docker_container_name_from_host()
+{
+local HOST="${1}"
+
+  docker --host=$( getdockersock "${HOST}" ) ps | awk "{ if (\$2==\"${DOCKER_IMAGE_TAG}\") { split(\"${HOST}\", h, ':'); split(\$6, p, \":\"); if (p[2]==h[2]) print \$7 } }"
+}
+
+function getdockersock()
+{
+local HOST="${1}"
+
+  printf "${DOCKERSOCK}" "${HOST}"
+}
+
+function docker_host_from_broker_id()
+{
+local BROKER="${1}"
+local H
+local DOCKERSOCK="$( getdockersock "${H}" )"
+
+
+  for H in "${VIRTHOSTS}"; do
+    for C in $( docker_container_id_list_from_host "${H}" ); do
+      BROKERID=$( docker --host="${DOCKERSOCK}" exec "${C}" awk -F ']' "/Group Metadata Manager on Broker/ { split(\$2, b, \" \"); print b[7]; exit }" "${KAFKA_HOME}/logs/server.log" )
+      if [ "${BROKER}" -eq "${BROKERID}" ]; then
+        echo "${H}"
+        break
+      fi
+    done
+  done
+}
+
+function docker_container_id_from_broker_id()
+{
+local BROKER="${1}"
+local H
+local DOCKERSOCK="$( getdockersock "${H}" )"
+
+
+  for H in "${VIRTHOSTS}"; do
+    for C in $( docker_container_id_list_from_host "${H}" ); do
+      BROKERID=$( docker --host="${DOCKERSOCK}" exec "${C}" awk -F ']' "/Group Metadata Manager on Broker/ { split(\$2, b, \" \"); print b[7]; exit }" "${KAFKA_HOME}/logs/server.log" )
+      if [ "${BROKER}" -eq "${BROKERID}" ]; then
+        echo "${C}"
+        break
+      fi
+    done
+  done
+}
+
+function docker_container_id_port_from_broker_id()
+{
+local BROKER="${1}"
+local H
+local C
+local P
+local IP
+local DOCKERSOCK="$( getdockersock "${H}" )"
+
+
+  for H in "${VIRTHOSTS}"; do
+    for IP in $( docker_container_id_port_list_from_host "${H}" ); do
+      C=${IP%=*}
+      P=${IP#*=}
+      P=${P#*:}
+      P=${P%->*}
+      BROKERID=$( docker --host="${DOCKERSOCK}" exec "${C}" awk -F ']' "/Group Metadata Manager on Broker/ { split(\$2, b, \" \"); print b[7]; exit }" "${KAFKA_HOME}/logs/server.log" )
+      if [ "${BROKER}" -eq "${BROKERID}" ]; then
+        echo "${C}" "${P}"
+        break
+      fi
+    done
+  done
+}
+
+function docker_container_id_from_broker_id()
+{
+local BROKER="${1}"
+local H
+local DOCKERSOCK="$( getdockersock "${H}" )"
+
+
+  for H in "${VIRTHOSTS}"; do
+    for C in $( docker_container_id_list_from_host "${H}" ); do
+      BROKERID=$( docker --host="${DOCKERSOCK}" exec "${C}" awk -F ']' "/Group Metadata Manager on Broker/ { split(\$2, b, \" \"); print b[7]; exit }" "${KAFKA_HOME}/logs/server.log" )
+      if [ "${BROKER}" -eq "${BROKERID}" ]; then
+        echo "${C}"
+        break
+      fi
+    done
+  done
+}
+
+function docker_brocker_id_container_id_from_host()
+{
+local HOST="${1}"
+local C
+#local P
+local IP
+local DOCKERSOCK="$( getdockersock "${HOST}" )"
+
+  for IP in $( docker_container_id_port_list_from_host "${HOST}" ); do
+    C=${IP%=*}
+#    P=${IP#*=}
+#    P=${P#*:}
+#    P=${P%->*}
+    BROKERID=$( docker --host="${DOCKERSOCK}" exec "${C}" awk -F ']' "/Group Metadata Manager on Broker/ { split(\$2, b, \" \"); print b[7]; exit }" "${KAFKA_HOME}/logs/server.log" )
+      echo "${BROKERID}" "${C}"
+  done
+}
+

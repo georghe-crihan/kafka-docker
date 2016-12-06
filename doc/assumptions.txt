@@ -1,0 +1,44 @@
+- The toolkit has been tested with IPv4. With moderate to little effort it can be
+ported to IPv6, if required.
+- The toolkit is assumed to run on some POSIX system with high degree of POSIX adherence (e.g. OSX would do, but WIN32 would rather not do).
+
+The machine where the harness runs (further referred to as techhost) has to.
+have the following installed:
+- docker-engine 
+- docker-compose (use install_docker_compose.sh if you like)
+- Kafka, bundled with zookeeper-shell.sh 
+- Python 3.5, (only because of docker-py requirements, the rest of the code uses at least v.2.6), env should be aware of it.
+- Kafka python from http://kafka-python.readthedocs.io/en/master/index.html
+ pip install kafka-python
+at least v.1.3.x is needed for functional testing stage, as Java is not yet my language of choice, it seems I'll start using it pretty soon, though
+- Python kazoo, at least 0.6
+- bash
+- coreutils
+- curl, set up to have Internet access
+- command line MUA (like mail(1)) to send notifications. NB: the MUA has to be able to send attachments via -a option, for logs (the default OSX MUA is not, this is taken care of; the Linux one is).
+- the machine is able to access virthosts and through their internal interface (VIRTHOSTIP), the docks, whose ports are mapped to it.
+- the machine has /root/k/${VIRTHOSTIP}/ mounted to /root/k on virthosts (this is required to update the compose configuration and scale on the virthosts). However, this could further be changed for the virthosts to retrieve the configuration from ZooKeeper or some SQL server, for example.
+
+The virtual hosts where the dockerized brokers would be run have:
+- Centos 7 (anakonda-ks.cfg provided for reference)
+- docker-engine (see DocumentScratchBuild.txt for setup)
+- the docker daemon is configured to use a network socket, accessible to the techhost via the VIRTHOSTIP
+- bash
+- coreutils
+- curl, set up to have Internet access
+- the advertized kafka host address and port are open in the firewall to techhost for monitoring and management purposes
+
+An optional standalone monitoring host is recommended though, to run the dockmon.py and clusterstatus.sh
+
+The infrastructure (see defaults.config):
+Whatever is the security policy on site, the virtual and the techost machines must have access to the following:
+- have access to the docker image repository (techhost pushes the images)
+- the zookeeper server, at least 3.4, up and running, used to manage Kafka clusters. I assume it not to be on the techhost, as my best practices suggest separating the monitoring infrastructure from the rest. (ZK_LIST)
+  - the applications inside docks, as well as those on the techhost, have full control over the /dockerized root (this could be configured in defaults.config) via some ACL (host ip or credentials, for example).
+- Docker repository, containing vanilla Centos images. See DocumentedScratchBuild.txt to build one on the techhost off the stock Centos 7 image MD5: (CentOS-7-x86_64-NetInstall-1511.iso) = 99d305fa40ec9e28ef8450c3bcc45f85, available publicly from the Internet.
+- techhost only: SMTP mail hub, I assume the techhost to be properly configured to send out notifications
+    - myself@example.com maintainer devops mailbox is available
+    - devopslist@example.com DevOps distribution list to send out notifications to the DevOps team is available
+- acess to the  Internet, via proxy or otherwise, alternatively, special local repositories have to be
+setup to allow for package installation.
+ 

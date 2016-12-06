@@ -1,0 +1,122 @@
+function get_scale_file()
+{
+local HOST="${1}"
+
+  echo $( printf "${DOCKER_COMPOSE_SCALE}" "${HOST}" )
+}
+
+function get_docker_compose_template()
+{
+local HOST="${1}"
+
+  printf "${DOCKER_COMPOSE_TEMPLATE}" "${HOST}"
+}
+
+function kafka_scale_up()
+{
+local HOST="${1}"
+local NUMBROKERS="${2}"
+local SCALE_FILE=$( get_scale_file "${HOST}" )
+local TEMPLATE=$( get_docker_compose_template "${HOST}" )
+local SCALE=$( cat ${SCALE_FILE} )
+
+  S=$(( ${SCALE} + ${NUMBROKERS} )) 
+  echo ${S} > ${SCALE_FILE} 
+
+  echo /opt/bin/docker-compose -H "$( getdockersock {HOST} )" "${TEMPLATE}" scale kafka=$( cat ${SCALE_FILE} ) 
+  gen_compose_template "${H}" "${S}"
+  echo "${SCALE}" scaled to "${S}"
+  exit 1 
+}
+
+function kafka_scale_down()
+{
+local HOST="${1}"
+local NUMBROKERS="${2}"
+local SCALE_FILE=$( get_scale_file "${HOST}" )
+local TEMPLATE=$( get_docker_compose_template "${HOST}" )
+local SCALE=$( cat ${SCALE_FILE} )
+local S=0
+
+  if [ "${SCALE}" -le "${NUMBROKERS}" ]; then
+    echo ${S} > "${SCALE_FILE}"
+  else
+    S=$(( ${SCALE} - ${NUMBROKERS} ))
+    echo ${S} > "${SCALE_FILE}" 
+  fi
+
+  echo /opt/bin/docker-compose -H "$( getdockersock ${HOST} )" -f "${TEMPLATE}" scale kafka=$( cat ${SCALE_FILE} ) 
+  gen_compose_template "${H}" "${S}"
+  echo "${SCALE}" scaled to "${S}"
+  exit 1 
+}
+
+function get_virthost_val()
+{
+local KEY="${1}"
+local DEFAULT="${2}"
+local KEYVAL
+local K
+local PREV_IFS="${IFS}"
+
+  IFS="
+"
+  for KEYVAL in $( set ); do
+    K="${KEYVAL%=*}"
+    if [ "${KEY}" == "${K}" ]; then
+      IFS="${PREV_IFS}"
+      echo "${KEYVAL#*=}"
+      return 0 
+    fi
+  done
+
+  IFS="${PREV_IFS}"
+  echo "${DEFAULT}"
+  return 1 
+}
+
+# Ammend this to have more template options
+function gen_compose_template()
+{
+local HOST="${1}"
+local ALTSCALE="${2}"
+local SCALE_FILE=$( get_scale_file "${HOST}" )
+local TEMPLATE=$( get_docker_compose_template "${HOST}" )
+local VIRTHOSTN=$( echo "${HOST}" | sed -e 's/\./_/g' )
+local INITIAL_SCALE=$( get_virthost_val "VIRTHOST_${VIRTHOSTN}_INITIAL_SCALE" "${VIRTHOST_DEFAULT_INITIAL_SCALE}" )
+local ADVERTISED_HOST_NAME=$( get_virthost_val "VIRTHOST_${VIRTHOSTN}_ADVERTISED_HOST_NAME" "${VIRTHOST_DEFAULT_ADVERTISED_HOST_NAME}" )
+  
+  if [ -z "${ALTSCALE}" ]; then
+    INITIAL_SCALE="${ALTSCALE}"
+  fi
+
+  cat k/docker-compose.yml.template | \
+  sed -e "s/@VIRT_HOST_IP@/${HOST}/g" | \
+  sed -e "s/@ADVERTISED_HOST_NAME@/${ADVERTISED_HOST_NAME}/g" | \
+  sed -e "s/@DOCKER_ZK_ROOT@/${ZK_DOCKER_ROOT}/g" | \
+  sed -e "s/@INITIAL_SCALE@/${INITIAL_SCALE}/g" > ${DOCKER_COMPOSE_TEMPLATE} 
+  echo "${INITIAL_SCALE}" > ${SCALE_FILE} 
+}
+
+function get_docker_conf()
+{
+local HOST="${1}"
+
+  printf "${DOCKER_COMPOSE_CONF}" "${HOST}"
+}
+
+function bootstrap_host()
+{
+local HOST="${1}"
+local TEMPLATE=$( get_docker_compose_template "${H}" )
+local SCALE_FILE=$( get_scale_file "${H}" )
+local DOCKER_CONF=$( get_docker_conf "${H}" )
+
+  cp k/* "${DOCKER_CONF}/"
+  gen_compose_template "${H}"
+  /opt/bin/docker-compose -H "$( getdockersock ${H} )" -f "${TEMPLATE}" build
+  /opt/bin/docker-compose -H "$( getdockersock ${H} )" -f "${TEMPLATE}" up 
+  /opt/bin/docker-compose -H "$( getdockersock ${H} )" -f "${TEMPLATE}" scale kafka=$( cat "${SCALE_FILE}" ) 
+  /opt/bin/docker-compose -H "$( getdockersock ${H} )" -f "${TEMPLATE}" stop 
+}
+

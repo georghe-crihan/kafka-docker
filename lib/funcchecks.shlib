@@ -1,0 +1,20 @@
+function check_broker()
+{
+local BROKER=${1}
+
+  lib/sync_producer.py broker ${BROKER} "Quick brown fox" ack
+  lib/sync_consumer.py broker ${BROKER} "Quick brown fox" 
+
+  return ${?}
+}
+
+function check_cluster()
+{
+# Used only for bootstrap
+local BROKER=${1}
+
+  lib/sync_producer.py cluster ${BROKER} "Quick clustered brown fox" ack
+  lib/sync_consumer.py cluster ${BROKER} "Quick clustered brown fox" 
+
+  return ${?}
+}
